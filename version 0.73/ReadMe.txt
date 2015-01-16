@@ -5,10 +5,6 @@ Lua Loader is a helper application for the Lua implementation on the esp8266 by 
 3. Set the LuaLoader comm port to COMx 9600 8-N-1
 4. Test with your chip - you should get the > prompt
 
-5. Upload LuaLoader.lua to the ESP board (will contain utility functions used by LuaLoader.exe)
-6. Upload init.lua (or insert dofile("LuaLoader.lua") in your own init.lua
-
-7. Enjoy
 
 Feedback via http://www.benlo.com/comments.html
 
@@ -40,7 +36,7 @@ LuaLoader is freeware.
 
 The MIT License (MIT)
 
-Copyright (c) 2014 Peter Jennings benlo.com
+Copyright (c) 2015 Peter Jennings benlo.com
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
