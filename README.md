@@ -11,40 +11,66 @@ The Buttons
 
 All buttons have popup help information on mouse over. A few explanations follow:
 
-<b>GPIO</b>. Set the IO pins to read or write. Change their values. Read values once or multiple times on a polling schedule. Read the ADC value.
-
-Heap. Print the current Heap (RAM) available. A common cause of restarts is running out of RAM.
-
-Restart. Perform a soft restart. The init.lua file is run automatically on restart.
-
-chipID. Each chip has a unique ID that can be used in a multiple IoT environment.
-
-tmr.stop. Stops one or more of the 7 timers. Right click to set which ones.
-
-Set AP. Set the chip to STATION mode and set the Access Point SSID and Password. The ESP8266 will automatically connect to the access point. The information is saved and after a restart the chip will automatically reconnect within 2 seconds, normally.
-
-Get IP. Get the currently assigned IP address, if any.
-
-Wifi Status. Show the current status of the Wifi connection.
-
-Disconnect. Disconnect from the access point.
-
-Upload File... Upload a file from your hard drive to the ESP8266 in text mode or binary mode. The folder used is now designated as the current workspace and the folder name is added to the File - Workspace menu.
-
-Upload Bin (or Text). Uploads the file named in the edit box below. Right click to select text or binary uploads. Binary uploads test each block with a checksum for data integrity and are faster. However, the LLbin() function in the LLbin.lua file must be loaded first.
-
-File Selection. A dropdown list of files in the current workspace and on the ESP8266. Files on the ESP8266 are marked with a < character.
-
-dofile. Executes the dofile() command to execute the file named in the text box above.
-
-remove. Remove the file named in the text box from the ESP8266 file system.
-
-cat. List the contents of the file named in the text box.
-
-Format. Format the flash file system on the ESP8266. Deletes all the files. Format only works if you are running firmware built after 2015.01.05.
-
-file.list. Lists the files in the ESP8266 flash file system. This list populates the drop down menu in the file name text box above.
-
+<p>
+<b>GPIO</b> Set the IO pins to read or write. Change their values. Read values once or multiple times
+on a polling schedule. Read the ADC value.
+</p>
+<p>
+<b>Heap</b>. Print the current Heap (RAM) available. A common cause of restarts is running out of RAM.
+</p>
+<p>
+<b>Restart</b>. Perform a soft restart. The init.lua file is run automatically on restart.
+</p>
+<p>
+<b>chipID</b>. Each chip has a unique ID that can be used in a multiple IoT environment.
+</p>
+<p>
+<b>tmr.stop</b>. Stops one or more of the 7 timers. Right click to set which ones.
+</p>
+<p>
+<b>Set AP</b>. Set the chip to STATION mode and set the Access Point SSID and Password. The ESP8266 will automatically connect to the access point. The information is saved and after a restart
+the chip will automatically reconnect within 2 seconds, normally.
+</p>
+<p>
+<b>Get IP</b>. Get the currently assigned IP address, if any.
+</p>
+<p>
+<b>Wifi Status</b>. Show the current status of the Wifi connection.
+</p>
+<p>
+<b>Disconnect</b>. Disconnect from the access point.
+</p>
+<p>
+<b>Upload File...</b> Upload a file from your hard drive to the ESP8266 in text mode or binary mode.
+The folder used is now designated as the current workspace and the folder name is added to the File -
+Workspace menu.
+</p>
+<p>
+<b>Upload Bin</b> (or Text). Uploads the file named in the edit box below. Right click to select
+text or binary uploads. Binary uploads test each block with a checksum for data integrity
+and are faster. However, the LLbin() function in the LLbin.lua file must be loaded first.
+</p>
+<p>
+<b>File Selection</b>. A dropdown list of files in the current workspace and on the ESP8266.
+Files on the ESP8266 are marked with a <b>&lt;</b> character.
+</p>
+<p>
+<b>dofile</b>. Executes the dofile() command to execute the file named in the text box above.
+</p>
+<p>
+<b>remove</b>. Remove the file named in the text box from the ESP8266 file system.
+</p>
+<p>
+<b>cat</b>. List the contents of the file named in the text box.
+</p>
+<p>
+<b>Format</b>. Format the flash file system on the ESP8266. Deletes all the files. Format only works
+if you are running firmware built after 2015.01.05.
+</p>
+<p>
+<b>file.list</b>. Lists the files in the ESP8266 flash file system. This list populates the drop
+down menu in the file name text box above.
+</p>
 
 
 LuaLoader is freeware.
