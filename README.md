@@ -1,5 +1,7 @@
 LuaLoader for Windows
-=========
+=====================
+
+More documentation and FAQ are at http://benlo.com/esp8266
 
 LuaLoader is a Windows program for uploading files to the ESP8266 and working with the Lua serial interface. It is compatible with all versions of Windows from Windows 95 to Windows 10.
 
