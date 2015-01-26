@@ -5,6 +5,8 @@ Lua Loader is a helper application for the Lua implementation on the esp8266 by 
 3. Set the LuaLoader comm port to COMx 9600 8-N-1
 4. Test with your chip - you should get the > prompt
 
+LLbin.lua should be in the same folder as LuaLoader.exe for binary uploads
+
 
 Feedback via http://www.benlo.com/comments.html
 
