@@ -1,10 +1,10 @@
-Kandun smart plug outlet controller
+Kankun smart plug outlet controller
 
 Full tutorial is at http://benlo.com/esp8266/KankunSmartPlug.html
 
 <hr>
 
-scp to the Kandun 
+scp to the Kankun 
 
 create /www/cgi-bin
 
