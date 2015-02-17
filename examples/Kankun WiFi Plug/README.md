@@ -1,7 +1,9 @@
 Kandun smart plug outlet controller
 
+Full tutorial is at http://benlo.com/esp8266/KankunSmartPlug.html
 
-
+<hr>
+
 scp to the Kandun 
 
 create /www/cgi-bin
@@ -11,11 +13,11 @@ chmod 755 cgi-bin
 put relay.cgi in cgi-bin
 
 
-
-upload init.lua and httpget.lua to esp8266
+<hr>
+upload init.lua and httpget.lua to the esp8266
 
 
-
+<hr>
 
 /www/index.html and /www/click.mp3 are optional
 
