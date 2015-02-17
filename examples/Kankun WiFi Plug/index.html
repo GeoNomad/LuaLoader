@@ -1,0 +1,109 @@
+<html>
+<head>
+<style>
+*{ margin:0; padding:0; }
+html, body{ height:100%; }
+body{ font:15px/1 arial; text-align:center; background:#307D9D; }
+body:before{ content:''; display:inline-block; height:100%; vertical-align:middle; }
+	
+.checkboxControl2{ 
+		border:2px solid #102838; border-radius:7px; display:inline-block; vertical-align:middle; font-weight:bold;
+		width:60px; height:100px; position:relative; margin:0 5px;
+		color:#12678C; box-shadow:0 0 5px rgba(255,255,255,.4);
+	}
+.checkboxControl2 input{ position:absolute; visibility:hidden; }
+.checkboxControl2 > div{ 
+		background:-webkit-linear-gradient(top, #002B44 0%, #0690AC 11%, #038EAA 14%, #A0F2FE 58%, #91DBE7 96%, #B9E8E8 100%); 
+		background:linear-gradient(to bottom, #002B44 0%, #0690AC 11%, #038EAA 14%, #A0F2FE 58%, #91DBE7 96%, #B9E8E8 100%); 
+		height:100%; border-radius:5px; line-height:50px; font-we0 0 3px 0px #F95757 inset, 0 0 12px 6px #F95757tion:relative; z-index:1; cursor:pointer; text-shadow:0 1px rgba(255,255,255,0.5);
+	}
+.checkboxControl2 > div:after{ 
+		content:'OFF'; display:block; height:50%; line-height:4;
+		transform-origin:0 0; -webkit-transform-origin:0 0;
+	}
+.checkboxControl2 > div:before{ 
+		content:'ON'; display:block; height:50%; line-height:2.5;
+		border-radius:80%/5px;
+		box-shadow:0 8px 12px -13px #89DFED inset, 0 -2px 2px -1px rgba(255,255,255,0.8);
+		transform-origin:0 100%; -webkit-transform-origin:0 100%; 
+		transform:scaleY(0.7); -webkit-transform:scaleY(0.7);
+	}
+	
+.checkboxControl2 :checked ~ div{ 
+		background:-webkit-linear-gradient(bottom, #002B44 0%, #0690AC 11%, #038EAA 14%, #A0F2FE 58%, #91DBE7 96%, #B9E8E8 100%);
+		background:linear-gradient(to top, #002B44 0%, #0690AC 11%, #038EAA 14%, #A0F2FE 58%, #91DBE7 96%, #B9E8E8 100%);
+	}
+.checkboxControl2 :checked ~ div:before{ 
+		border-radius:0; box-shadow:none;
+		transform:none; -webkit-transform:none;
+	}
+.checkboxControl2 :checked ~ div:after{ 
+		border-radius:80%/5px;
+		box-shadow:0 -8px 12px -5px #89DFED inset, 0 2px 2px 0 #0690AC;
+		transform:scaleY(0.7); -webkit-transform:scaleY(0.7);
+	}
+
+/* the light indicator to the top of the button */
+.checkboxControl2 .indicator{ position:absolute; top:-20px; left:17px; width:25px; height:8px; box-shadow:0 0 8px #000 inset; border:1px solid rgba(255,255,255,0.1); border-radius:15px; transition:0.2s; -webkit-transition:0.2s; }
+	.checkboxControl2 .indicator:before{ content:''; display:block; margin:2px auto; width:8px; height:5px; border-radius:10px; transition:0.5s; -webkit-transition:0.5s; }
+	.checkboxControl2 :checked ~ .indicator:before{ box-shadow:0 0 2px 0px #F95757 inset, 0 0 12px 6px #F95757; background:#FFF; transition:0.1s; -webkit-transition:0.1s; }
+</style>
+<script>
+function switchx( cmd )
+   {
+   if ( timer ) clearTimeout(timer);
+   var relay = new XMLHttpRequest();
+   relay.open('GET',"/cgi-bin/relay.cgi?"+cmd, true);
+   relay.send();
+   relay.onreadystatechange = function() 
+      {
+      if( relay.readyState == 4 )
+         { 
+         if ( relay.status == 200 )
+            {
+            if (relay.responseText.indexOf("ON")>=0)
+               {
+               $('cbox').checked = true;
+               }
+            else
+               {
+               $('cbox').checked = false;
+               }
+            }
+         }
+      }
+    var timer = setTimeout(function(){ switchx("state"); }, 3000)
+    }
+
+function check(checkbox)
+  {
+  if (checkbox.checked)
+    {
+    switchx('on');
+    }
+  else
+    {
+    switchx('off');
+    }
+  }
+var snd = new Audio('click.mp3');
+
+document.addEventListener('change', function(e){
+	if(e.target.parentNode.className.indexOf('checkboxControl') != -1){
+		snd.currentTime = 0;
+		snd.play(); 
+	}
+});
+
+function $(id) { return document.getElementById(id); }
+
+</script>
+</head>
+<body onload="switchx('state')">
+<label class='checkboxControl2'>
+	<input type='checkbox' id="cbox" onclick="check(this)" />
+	<div></div>
+	<span class='indicator' id="Lnav"></span>
+</label>
+</body>
+</html>
