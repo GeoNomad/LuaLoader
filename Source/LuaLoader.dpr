@@ -18,6 +18,7 @@ begin
   Application.Run;
   net.Free;
   SerialNGAdvDLG.Free;
+  Halt;
   Form1.Free;
 end.
 

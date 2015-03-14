@@ -11,10 +11,23 @@ unit LuaLoaderMain;
 //  LuaLoaderMain.pas is open source MIT License, but the SerialNG component has its separate license
 //
 //  netstat.pas is not included, comment out lines containing net. or replace with your own net.geturl function
+//     geturl is not necessary for functionality - just for checking latest versions, etc.
 //
 //  const ThisVersion  is set below
 
 //  TODO - add tmr.stop on restart automatically, also resume higher baud rate
+
+//  0.86 changed the default value of DTR and RTS to false = HI
+//  0.86 updated latest firmware URL to github/releases
+//  0.86 fixed upload all .lua files bug (uploading .lua.bak)
+//  0.86 added right click to Read - set autoread repeat rate
+
+//  0.85 fix bug in upload all aborting
+//  0.85 added download binary
+//  0.95 added compile button
+//  0.85 added do(lc) button - executes lc version of selected .lua file
+
+//  0.84 fixed bug in < Upload all .lua files (! and < were included)
 
 //  0.83 check for new ports when opening dialog (no need to restart LL)
 //  0.83 add Upload all .lua files
@@ -154,8 +167,8 @@ type
     DoFileBtn: TButton;
     RemoveBtn: TButton;
     CatBtn: TButton;
-    UploadAgainBtn: TButton;
     UploadBtn: TButton;
+    UploadFileBtn: TButton;
     SendFileBtn: TButton;
     SendBtn: TButton;
     PasteBtn: TButton;
@@ -280,6 +293,14 @@ type
     Custom: TButton;
     CustomPopup: TPopupMenu;
     Resetfunctionality1: TMenuItem;
+    Compile: TButton;
+    DownLoadBtn: TButton;
+    DoFileCompiled: TButton;
+    DLDecoder: TSuperTimer;
+    ListlcM: TMenuItem;
+    ListallM: TMenuItem;
+    ReadRateM: TPopupMenu;
+    Setrepeatrateforread1: TMenuItem;
     procedure AdvSettingsBtnClick(Sender: TObject);
     procedure SerialPortNG1RxClusterEvent(Sender: TObject);
     procedure SerialPortNG1ProcessError(Sender: TObject; Place,Code: DWord; Msg: String);
@@ -295,7 +316,7 @@ type
     procedure FormShow(Sender: TObject);
     procedure GetIPBtnClick(Sender: TObject);
     procedure SetAPBtnClick(Sender: TObject);
-    procedure UploadBtnClick(Sender: TObject);
+    procedure UploadFileBtnClick(Sender: TObject);
     procedure DoFileBtnClick(Sender: TObject);
     procedure TmrStopClick(Sender: TObject);
     procedure APSurveyBtnClick(Sender: TObject);
@@ -318,7 +339,7 @@ type
     procedure BugReports1Click(Sender: TObject);
     procedure WikiReference1Click(Sender: TObject);
     procedure BuyESP8266Boards1Click(Sender: TObject);
-    procedure UploadAgainBtnClick(Sender: TObject);
+    procedure UploadBtnClick(Sender: TObject);
     procedure Settings1Click(Sender: TObject);
     procedure ConnectMClick(Sender: TObject);
     procedure SetModeClick(Sender: TObject);
@@ -399,6 +420,12 @@ type
     procedure Setcurrentvalueasstartupdefault1Click(Sender: TObject);
     procedure CustomClick(Sender: TObject);
     procedure Resetfunctionality1Click(Sender: TObject);
+    procedure CompileClick(Sender: TObject);
+    procedure DoFileCompiledClick(Sender: TObject);
+    procedure DownLoadBtnClick(Sender: TObject);
+    procedure DecodeDL(Sender: TObject);
+    procedure ListlcMClick(Sender: TObject);
+    procedure ListallMClick(Sender: TObject);
   private
     { Private declarations }
     RxDCharStartTimer : Boolean;
@@ -411,7 +438,7 @@ type
     function  AwaitPrompt(delay : integer) : boolean;
   public
     { Public declarations }
-    procedure Upload(fname : string);
+    function Upload(fname : string) : boolean ;
   end;
 
 var
@@ -440,8 +467,15 @@ var
   LocalDocs     : string;
   FilesOnESP    : TStringList;
   StartingBin   : Boolean;
+  LLBinNil      : Boolean;
   CannotOpen    : Boolean;
   DoingBin      : Boolean;
+
+  xxdNil        : Boolean;
+  DoingDL       : Boolean;
+  StartingDL    : Boolean;
+  CannotOpenxxd : Boolean;
+
 AbortUnexpected : Boolean;
 
   DTRdefault    : Boolean;
@@ -449,10 +483,11 @@ AbortUnexpected : Boolean;
 
 RecentDocFiles  : TStringList;
 RecentFiles     : TStringList;
+DLCapture       : string;
 CustomLuaFile   : string;
 
 const
-  ThisVersion  = '0.83 ';                 // change with each version
+  ThisVersion  = '0.86 ';                 // change with each version
   CRLF         = #$0d#$0a ;
 
 implementation
@@ -522,9 +557,14 @@ function FileTime( filename : string) : integer;
 var
 F : TSearchRec;
 begin
-FindFirst(filename,faAnyFile,F);
-Result := F.Time;
-FindClose(F);
+if FileExists(filename) then
+   begin
+   FindFirst(filename,faAnyFile,F);
+   Result := F.Time;
+   FindClose(F);
+   end
+else
+   Result := 0;
 end;
 
 procedure TForm1.FormCreate(Sender: TObject);
@@ -573,7 +613,7 @@ Height     := Regx.ReadInteger('LuaLoader','Height',Height);
 WorkingDir := Regx.ReadString('LuaLoader','WorkingDir',ExtractFilePath(ParamStr(0)));
 
 EditBtn.Hint := 'Edit '+workingDir+FilenameE.Text;
-UploadAgainBtn.Hint := 'Upload '+ workingDir+FilenameE.Text;
+UploadBtn.Hint := 'Upload '+ workingDir+FilenameE.Text;
 
 GPIO.Text      := Regx.ReadString('LuaLoader','GPIO',' 3 GPIO0');
 SSID.Text      := Regx.ReadString('LuaLoader','SSID','SSID');
@@ -588,21 +628,21 @@ LogTerminalM.Checked        :=  Regx.ReadBool('LuaLoader','Logging',False);
 AutoResetBaudRateM.Checked  :=  Regx.ReadBool('LuaLoader','AutoResetBaudRate',True);
 FastUp.Checked              :=  Regx.ReadBool('LuaLoader','FastUploads',False);
 
-DTRdefault                  :=  Regx.ReadBool('LuaLoader','DTRdefault',True);
-RTSdefault                  :=  Regx.ReadBool('LuaLoader','RTSdefault',True);
+DTRdefault                  :=  Regx.ReadBool('LuaLoader','DTRdefault',False);
+RTSdefault                  :=  Regx.ReadBool('LuaLoader','RTSdefault',False);
 
 ESPLua.Checked              :=  Regx.ReadBool('LuaLoader','ESPLuaOnly',True);
 WSLua.Checked               :=  Regx.ReadBool('LuaLoader','WSLuaOnly',True);
 UseBin.Checked              :=  Regx.ReadBool('LuaLoader','BinaryUpload',False);
 if UseBin.Checked then
    begin
-   UploadAgainBtn.Caption := 'Upload Bin';
+   UploadBtn.Caption := 'Upload Bin';
    UploadBinary1.Checked := True;
    UploadText1.Checked := False;
    end
 else
    begin
-   UploadAgainBtn.Caption := 'Upload Text';
+   UploadBtn.Caption := 'Upload Text';
    UploadBinary1.Checked := False;
    UploadText1.Checked := True;
    end;
@@ -821,6 +861,7 @@ var
 line : string;
 x, y : integer;
 newf : string;
+DL : TStringList;
 begin
   if SerialPortNG1.NextClusterSize >= 0 then // Data available?
     begin
@@ -862,7 +903,7 @@ begin
     if StartingBin then
        begin
        if Pos('LLbin'' (a nil',line) > 0 then
-          UploadAgainBtn.Caption := 'Upload Bin';  // aborts bin when caption was Abort
+          LLBinNil := True;
        if Pos('cannot open LLbin.lua',line) > 0 then
           CannotOpen := True;
        end;
@@ -872,11 +913,37 @@ begin
        if Pos('unexpected symbol',line) > 0 then
           begin
           AbortUnexpected := True;
-          UploadAgainBtn.Caption := 'Upload Bin';  // aborts bin when caption was Abort
+          UploadBtn.Caption := 'Upload Bin';  // aborts bin when caption was Abort
           Show(CRLF+'Binary upload requires NodeMCU build 20150105 or newer'+CRLF,1);
           end;
        end;
-       
+
+    if StartingDL then
+       begin
+       if Pos('xxd'' (a nil',line) > 0 then
+          begin
+          xxdNil := True;
+          DoingDL := False;
+          end;
+       if Pos('cannot open xxd.lua',line) > 0 then
+          CannotOpenxxd := True;
+       end;
+
+    if DoingDL then
+       begin
+       DLCapture := DLCapture + line;
+       if Pos('EOF',line) > 0 then
+          begin
+          DL := TStringList.Create;
+          DL.Add(DLCapture);
+          DL.SaveToFile(ExtractFilePath(ParamStr(0))+'xxd.temp');
+          DL.Free;
+          DLCapture := '';
+          DoingDL := False;
+          DLDecoder.Enabled := True;
+          end;
+       end;
+
     if 0 < Pos('>',line) then
        begin
        Prompt := True;
@@ -1095,7 +1162,7 @@ Send('wifi.setmode(wifi.STATION)'+CRLF,1);
 Send('wifi.sta.config("'+SSID.Text+'","'+Password.Text+'")'+CRLF,1);
 end;
 
-procedure TForm1.Upload(fname : string);
+function TForm1.Upload(fname : string) : boolean;
 var
 SendStr : String;
 lines : TStringList;
@@ -1111,7 +1178,8 @@ f : file of byte;
 x : byte;
 nbytes : integer;
 begin
-UploadAgainBtn.Caption := 'Abort';
+UploadBtn.Caption := 'Abort';
+Result := True;
 
 timeoutc := 0;
 okc := 0;
@@ -1134,9 +1202,10 @@ if i = Workspace.Count then
 
 if not FileExists(fname) then
    begin
-   if UseBin.Checked then UploadAgainBtn.Caption := 'Upload Bin'
-   else UploadAgainBtn.Caption := 'Upload Text';
-   ShowMessage(fname + ' not found');
+   if UseBin.Checked then UploadBtn.Caption := 'Upload Bin'
+   else UploadBtn.Caption := 'Upload Text';
+   if Pos('LLbin.lua',fname) = 0 then                   // don't stop all when LLbin.lua asked for
+      ShowMessage(fname + ' not found');
    exit;
    end;
 
@@ -1145,7 +1214,7 @@ FilenameE.Text := name;
 FilesOnESP.Add('< '+name);
 
 EditBtn.Hint := 'Edit '+workingDir+FilenameE.Text;
-UploadAgainBtn.Hint := 'Upload '+ workingDir+FilenameE.Text;
+UploadBtn.Hint := 'Upload '+ workingDir+FilenameE.Text;
 
 i := RecentFiles.Add(workingDir+FilenameE.Text);
 RecentFiles.Objects[i] := TObject(FileTime(workingDir+FilenameE.Text));
@@ -1174,18 +1243,19 @@ Show(FormatDateTime('dddddd  hh:nn:ss',Now),1);
 
 if UseBin.Checked then
     begin
-    Show('Binary upload: '+  workingDir+FilenameE.Text,1);
+    Show('Binary upload: '+  workingDir+FilenameE.Text,0);
 //    Log( 'Binary upload: '+  workingDir+FilenameE.Text);
 
     StartingBin := True;
+    LLBinNil := False;
     Send('LLbin("'+name+'")'+CRLF,1);
     AwaitPrompt(500);
-    if Pos('Upload',UploadAgainBtn.Caption) > 0 then
+    if LLBinNil then       // LLBin function doesn't exist
        begin
        Send('uart.setup(0,'+IntToStr(SerialPortNG1.BaudRate)+',8,0,1,1)'+CRLF,0);
        AwaitPrompt(500);
        CannotOpen := False;
-       Send('dofile("LLbin.lua")'+CRLF,1);
+       Send('dofile("LLbin.lua")'+CRLF,1);      // create LLBin()
        AwaitPrompt(500);
        if CannotOpen then
           begin
@@ -1194,25 +1264,33 @@ if UseBin.Checked then
              begin
              FilenameE.Text := 'LLbin.lua';
              UseBin.Checked := False;
-             UploadAgainBtn.Caption := 'Upload Text';
-             Upload(ExtractFilePath(ParamStr(0))+'LLbin.lua');
-             Send(CRLF,1);
-             Send('dofile("LLbin.lua")'+CRLF,1);
-             AwaitPrompt(500);
-             Upload(fname);
-             exit;
+             UploadBtn.Caption := 'Upload Text';
+             if Upload(ExtractFilePath(ParamStr(0))+'LLbin.lua') then
+                begin
+                Send(CRLF,1);
+                Send('dofile("LLbin.lua")'+CRLF,1);
+                AwaitPrompt(500);
+                result := Upload(fname);
+                exit;
+                end
+             else
+                begin
+                result := False;
+                exit;
+                end;
              end
           else
              begin
              Show(CRLF+ExtractFilePath(ParamStr(0))+'LLbin.lua not found',1);
              FilenameE.Text := 'LLbin.lua';
              UseBin.Checked := False;
-             UploadAgainBtn.Caption := 'Upload Text';
+             UploadBtn.Caption := 'Upload Text';
              Send(CRLF,1);
+             result := false;
              exit;
              end;
           end;
-       Upload(fname);
+       result := Upload(fname);
        exit;
        end;
     StartingBin := False;
@@ -1227,7 +1305,7 @@ if UseBin.Checked then
     AbortUnexpected := False;
     while( not eof(f) ) do
         begin
-        if Pos('Upload',UploadAgainBtn.Caption) > 0 then
+        if AbortUnexpected then
            begin
            Show(CRLF+'Aborting upload...',1);
            nbytes := 0;
@@ -1257,7 +1335,9 @@ if UseBin.Checked then
        AwaitPrompt(5000);
        end;
     if not AbortUnexpected then
-       Send('EOF EOF EOF'+CRLF,1);
+       Send('EOF EOF EOF'+CRLF,1)
+    else
+       Result := False;
     AbortUnexpected := False;
     AwaitPrompt(5000);
     Send('uart.setup(0,'+IntToStr(SerialPortNG1.BaudRate)+',8,0,1,1)'+CRLF,0);
@@ -1281,7 +1361,7 @@ else
     nbytes := 0;
     for i := 0 to lines.Count-1 do
         begin
-        if Pos('Upload',UploadAgainBtn.Caption) > 0 then
+        if Pos('Upload',UploadBtn.Caption) > 0 then
            begin
            break;
            end;
@@ -1308,7 +1388,7 @@ else
     end;
 
 
-{if UploadAgainBtn.Caption = 'Abort' then
+{if UploadBtn.Caption = 'Abort' then
     begin
     if mrYes = MessageDlg('DoFile( '+name+' ) now?', mtInformation,[mbYes,mbNo], 0) then
        begin
@@ -1318,22 +1398,22 @@ else
 DoingBin := False;
 if Pos('LLbin.lua',FilenameE.Text) > 0 then UseBin.Checked := True;
 
-if UseBin.Checked then UploadAgainBtn.Caption := 'Upload Bin'
-else UploadAgainBtn.Caption := 'Upload Text'
+if UseBin.Checked then UploadBtn.Caption := 'Upload Bin'
+else UploadBtn.Caption := 'Upload Text';
 end;
 
 
 
 
-procedure TForm1.UploadBtnClick(Sender: TObject);
+procedure TForm1.UploadFileBtnClick(Sender: TObject);
 begin
 OpenDialog1.Title := 'Choose File to Upload';
 OpenDialog1.Filename := workingDir + FilenameE.Text;
 OpenDialog1.FilterIndex := 1;
 if not OpenDialog1.Execute then
    begin
-   if UseBin.Checked then UploadAgainBtn.Caption := 'Upload Bin'
-   else UploadAgainBtn.Caption := 'Upload Text';
+   if UseBin.Checked then UploadBtn.Caption := 'Upload Bin'
+   else UploadBtn.Caption := 'Upload Text';
    exit;
    end;
 Upload(OpenDialog1.Filename)
@@ -1499,19 +1579,20 @@ begin
 ShowURL('http://www.benlo.com/shop/shop.php?shop=a&for=Programming+in+Lua');
 end;
 
-procedure TForm1.UploadAgainBtnClick(Sender: TObject);
+procedure TForm1.UploadBtnClick(Sender: TObject);
 begin
-if  UploadAgainBtn.Caption = 'Abort' then
+if  UploadBtn.Caption = 'Abort' then
    begin
-   if UseBin.Checked then UploadAgainBtn.Caption := 'Upload Bin'
-   else UploadAgainBtn.Caption := 'Upload Text'
+   if UseBin.Checked then UploadBtn.Caption := 'Upload Bin'
+   else UploadBtn.Caption := 'Upload Text' ;
+   AbortUnexpected := True;
    end
 else
    begin
-   UploadAgainBtn.Caption := 'Abort';
+   UploadBtn.Caption := 'Abort';
    Upload( workingDir+FilenameE.Text );
    EditBtn.Hint := 'Edit '+workingDir+FilenameE.Text;
-   UploadAgainBtn.Hint := 'Upload '+ workingDir+FilenameE.Text;
+   UploadBtn.Hint := 'Upload '+ workingDir+FilenameE.Text;
    RemoveBtn.Hint := 'Delete '+FilenameE.Text;
    end;
 end;
@@ -1775,8 +1856,8 @@ end;
 
 procedure TForm1.Downloadlatestfirmware1Click(Sender: TObject);
 begin
-ShowMessage('Browse to the latest bin file'#13'Right click on Show Raw'#13'and save as nodemcu_512k.bin'#13'in the same folder as esp8266_flasher.exe');
-ShowURL('https://github.com/nodemcu/nodemcu-firmware/tree/master/pre_build');
+ShowMessage('Save the latest bin file in the same folder as the flasher app');
+ShowURL('https://github.com/nodemcu/nodemcu-firmware/releases');
 end;
 
 
@@ -1899,14 +1980,15 @@ for i := 0 to FilesOnESP.Count-1 do
     begin
     if ESPLua.Checked then
        begin
-       if Pos('.lua',FilesOnESP[i]) > 0 then FilenameE.Items.Add(FilesOnESP[i]);
+       if Pos('.lua'+'$',FilesOnESP[i]+'$') > 0 then FilenameE.Items.Add(FilesOnESP[i]);
        end
     else
        FilenameE.Items.Add(FilesOnESP[i]);
     end;
-   
-if WSLua.Checked then ext := '*.lua'
-else ext := '*.*';
+
+ext := '*.*';
+if WSLua.Checked then ext := '*.lua';
+if ListlcM.Checked then ext := '*.lc';
 
 if 0 = FindFirst(WorkingDir +ext, faAnyFile, SearchRec) then
    begin
@@ -1952,10 +2034,8 @@ for i := 0 to FilenameE.Items.Count-1 do
          end;
       end;
    end;
-if changed > 0 then
-   FilenameE.Items.Add('< Upload all changed files')
-else
-   FilenameE.Items.Add('< Upload all .lua files' );
+if changed > 0 then FilenameE.Items.Add('< Upload all changed files');
+FilenameE.Items.Add('< Upload all .lua files' );
 end;
 
 procedure TForm1.tmrstop01Click(Sender: TObject);
@@ -1982,7 +2062,7 @@ else
    begin
    workingDir := TMenuItem(sender).Caption;
    EditBtn.Hint := 'Edit '+workingDir+FilenameE.Text;
-   UploadAgainBtn.Hint := 'Upload '+ workingDir+FilenameE.Text;
+   UploadBtn.Hint := 'Upload '+ workingDir+FilenameE.Text;
    StatusBar.SimpleText := 'Working Directory: '+workingDir;
    end;
 end;
@@ -2010,6 +2090,7 @@ end;
 procedure TForm1.FixFilenameStop(Sender: TObject);
 var
 i : integer;
+fname : string;
 begin
 FixFilename.Enabled := False;
 if Pos('< ',FilenameE.Text) = 1 then
@@ -2034,8 +2115,9 @@ if Pos('Upload all changed',FilenameE.Text) > 0 then
       begin
       if Pos('! ',FilenameE.Items[i]) = 1 then
          begin
-         if  UploadAgainBtn.Caption = 'Abort' then break;
-         Upload(workingDir + Copy(FilenameE.Items[i],3,999));
+         if  UploadBtn.Caption = 'Abort' then break;
+         if not Upload(workingDir + Copy(FilenameE.Items[i],3,999)) then
+            break;
          end;
       end;
    end;
@@ -2044,11 +2126,14 @@ if Pos('Upload all .lua',FilenameE.Text) > 0 then
    FilenameE.Text := '';
    for i := 0 to FilenameE.Items.Count-1 do
       begin
-      if Pos('.lua',FilenameE.Items[i]) > 1 then
+      fname :=  FilenameE.Items[i];
+      if Pos('.lua'+'$', fname+'$') > 1 then
          begin
-         if  UploadAgainBtn.Caption = 'Abort' then break;
-         if Pos('Upload all',FilenameE.Items[i]) > 0 then continue;
-         Upload(workingDir + FilenameE.Items[i]);
+         if Pos('Upload all',fname) > 0 then continue;
+         if Pos('< ',fname) = 1 then fname := Copy(fname,3,999);
+         if Pos('! ',fname) = 1 then fname := Copy(fname,3,999);
+         if not Upload(workingDir + fname) then
+            break;
          end;
       end;
    end;
@@ -2277,13 +2362,13 @@ begin
 UseBin.Checked := not UseBin.Checked;
 if UseBin.Checked then
    begin
-   UploadAgainBtn.Caption := 'Upload Bin';
+   UploadBtn.Caption := 'Upload Bin';
    UploadBinary1.Checked := True;
    UploadText1.Checked := False;
    end
 else
    begin
-   UploadAgainBtn.Caption := 'Upload Text';
+   UploadBtn.Caption := 'Upload Text';
    UploadBinary1.Checked := False;
    UploadText1.Checked := True;
    end;
@@ -2292,14 +2377,14 @@ end;
 procedure TForm1.UploadBinary1Click(Sender: TObject);
 begin
 UseBin.Checked := True;
-UploadAgainBtn.Caption := 'Upload Bin';
+UploadBtn.Caption := 'Upload Bin';
 UploadBinary1.Checked := True;
 end;
 
 procedure TForm1.UploadText1Click(Sender: TObject);
 begin
 UseBin.Checked := False;
-UploadAgainBtn.Caption := 'Upload Text';
+UploadBtn.Caption := 'Upload Text';
 UploadText1.Checked := True;
 end;
 
@@ -2395,6 +2480,195 @@ procedure TForm1.Resetfunctionality1Click(Sender: TObject);
 begin
 Custom.Caption := 'Custom';
 CustomLuaFile  := '';
+end;
+
+procedure TForm1.CompileClick(Sender: TObject);
+begin
+Send('node.compile("'+FileNameE.Text+'")'+CRLF,1);
+end;
+
+procedure TForm1.DoFileCompiledClick(Sender: TObject);
+var
+fname : string;
+begin
+fname := FilenameE.Text;
+if Pos('.lua',fname) > 0 then
+fname := StringReplace(fname,'.lua','.lc',[]);
+Show('dofile('+fname+')  '+ FormatDateTime('dddddd  hh:nn:ss',Now),1);
+Send('dofile("'+fname+'")'+CRLF,1);
+end;
+
+procedure TForm1.DownLoadBtnClick(Sender: TObject);
+var
+newrate : integer;
+fname : string;
+begin
+DLCapture := '';
+
+newrate := SerialPortNG1.BaudRate;
+if FastUp.Checked and (SerialPortNG1.BaudRate <> 921600) then
+   begin
+   newrate := 921600;
+   BaudRate.ItemIndex := 8;
+   Show('Baud rate changed to '+IntToStr(newrate),1);
+   end;
+
+Send('uart.setup(0,'+IntToStr(newrate)+',8,0,1,1)'+CRLF,0);
+Pause(300);  // allow command to be sent
+
+SerialPortNG1.BaudRate := newrate;
+SerialPortNG1.WriteSettings('Software\Benlo.com','LuaLoader');
+
+AwaitPrompt(2000);
+Send('tmr.stop(0)'+CRLF,0);
+AwaitPrompt(250);
+Send('tmr.stop(1)'+CRLF,0);
+AwaitPrompt(250);
+
+StartingDL := True;
+DoingDL    := True;
+xxdNil := False;
+fname := FilenameE.Text;
+
+Send('xxd("'+fname+'")'+CRLF,1);
+AwaitPrompt(500);
+
+
+if xxdNil then       // LLBin function doesn't exist
+   begin
+   Send('uart.setup(0,'+IntToStr(SerialPortNG1.BaudRate)+',8,0,1,1)'+CRLF,0);
+    AwaitPrompt(500);
+    CannotOpenxxd := False;
+    Send('dofile("xxd.lua")'+CRLF,1);      // create LLBin()
+    AwaitPrompt(500);
+    if CannotOpenxxd then
+       begin
+       Show('xxd.lua not found. Installing xxd.lua...',1);
+       if FileExists( ExtractFilePath(ParamStr(0))+'xxd.lua') then
+          begin
+          FilenameE.Text := 'xxd.lua';
+          UseBin.Checked := True;
+          UploadBtn.Caption := 'Upload Bin';
+          if Upload(ExtractFilePath(ParamStr(0))+'xxd.lua') then
+             begin
+             Send(CRLF,1);
+             Send('dofile("xxd.lua")'+CRLF,1);
+             AwaitPrompt(500);
+             DoingDL := True;
+             Send('xxd("'+fname+'")'+CRLF,1);
+             AwaitPrompt(500);
+             end
+          else
+             begin
+             exit;
+             end;
+          end
+       else
+          begin
+          Show(CRLF+ExtractFilePath(ParamStr(0))+'xxd.lua not found',1);
+          Send(CRLF,1);
+          exit;
+          end;
+       end
+    else        // CannotOpenxxd false
+       begin
+       DLCapture := '';
+       DoingDL    := True;
+       xxdNil := False;
+       Send('xxd("'+fname+'")'+CRLF,1);
+       AwaitPrompt(500);
+       end;
+    end;
+FilenameE.Text := Fname;
+StartingDL := False;
+end;
+
+procedure TForm1.DecodeDL(Sender: TObject);
+var
+dldata : TStringList;
+f : file of byte;
+x : string;
+buffer : array of byte;
+buflen : integer;
+n,i,j : integer;
+fname : string;
+line : string;
+csum : integer;
+linesum : integer;
+waitstart : Boolean;
+errors : Boolean;
+begin
+dldata := TStringList.Create;
+dldata.LoadFromFile(ExtractFilePath(ParamStr(0))+'xxd.temp');
+n := Pos('xxd("',dldata.Text);
+if n = 0 then exit;
+
+fname := copy(dldata.Text,n+5,99);
+delete(fname,Pos('"',fname),999);
+
+errors := False;
+buflen := 0;
+waitstart := True;
+for i := 0 to dldata.count-1 do
+   begin
+   if Pos('xxd("',dldata[i]) > 0 then continue;
+   if Pos('EOF',dldata[i]) > 0 then break;
+   if Pos('Downloading',dldata[i]) > 0 then
+      begin
+      waitstart := False;
+      continue;
+      end;
+   if waitstart then continue;
+   line := dldata[i];
+   csum := 0;
+   for j := 0 to 15 do
+      begin
+      SetLength(buffer, buflen+32);
+      if Length(line) > j*3 then
+         begin
+         x := Copy(line,j*3+1,2);
+         try
+         buffer[buflen] := byte(strtoint('$'+ x[1]+x[2]));
+         except;
+         errors := True;
+         end;
+         csum := csum + ord(buffer[buflen]);
+         inc(buflen);
+         end
+      else
+         break;
+      end;
+   if Length(line) > 49 then
+      begin
+      linesum := StrToInt(Copy(line,49,99));
+      if linesum <> csum then
+         errors := True;
+      end;
+   end;
+SaveDialog1.Title := 'Save downloaded file';
+SaveDialog1.Filename := fname;
+SaveDialog1.FilterIndex := 4;
+if SaveDialog1.Execute then
+   begin
+   assignFile(f,SaveDialog1.Filename);
+   rewrite(f);
+   for i := 0 to buflen-1 do
+      write(f,buffer[i]);
+   CloseFile(f);
+   end;
+//dldata.free;
+if errors then
+   ShowMessage('CSUM errors detected');
+end;
+
+procedure TForm1.ListlcMClick(Sender: TObject);
+begin
+ListlcM.Checked := not ListlcM.Checked;
+end;
+
+procedure TForm1.ListallMClick(Sender: TObject);
+begin
+ListallM.Checked := not ListAllM.Checked;
 end;
 
 end.
