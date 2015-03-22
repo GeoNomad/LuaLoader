@@ -58,10 +58,12 @@ type
     CBReport: TComboBox;
     Label17: TLabel;
     EventCharEdit: TEdit;
+    PortBtn: TButton;
     procedure ValidateCharInput(Sender: TObject);
     procedure ValidateInteger(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormShow(Sender: TObject);
+    procedure PortBtnClick(Sender: TObject);
   private
     { Private declarations }
   public
@@ -77,6 +79,8 @@ function CharToEdit(C : Char):String;
 function EditToChar(S : String; DefaultC : Char):Char;
 
 implementation
+
+uses netstat;
 
 {$R *.DFM}
 
@@ -245,6 +249,11 @@ end;
 procedure TSerialNGAdvDLG.FormShow(Sender: TObject);
 begin
   GetCommNames(CBPort.Items);
+end;
+
+procedure TSerialNGAdvDLG.PortBtnClick(Sender: TObject);
+begin
+net.ShowURL('http://benlo.com/esp8266/index.html#faq');
 end;
 
 end.

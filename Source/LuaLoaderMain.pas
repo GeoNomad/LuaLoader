@@ -17,6 +17,8 @@ unit LuaLoaderMain;
 
 //  TODO - add tmr.stop on restart automatically, also resume higher baud rate
 
+//  0.87 set default DTR and RTS on each connect
+
 //  0.86 changed the default value of DTR and RTS to false = HI
 //  0.86 updated latest firmware URL to github/releases
 //  0.86 fixed upload all .lua files bug (uploading .lua.bak)
@@ -436,6 +438,7 @@ type
     procedure Send(line : string; mode : integer);
     procedure Show(line : string; mode : integer);
     function  AwaitPrompt(delay : integer) : boolean;
+    procedure ActivateSerial(Sender: TObject);
   public
     { Public declarations }
     function Upload(fname : string) : boolean ;
@@ -487,7 +490,7 @@ DLCapture       : string;
 CustomLuaFile   : string;
 
 const
-  ThisVersion  = '0.86 ';                 // change with each version
+  ThisVersion  = '0.87 ';                 // change with each version
   CRLF         = #$0d#$0a ;
 
 implementation
@@ -790,6 +793,12 @@ Net.GetURL('http://benlo.com/esp8266/LuaLoader.php?LL=1&api=1&version='+ThisVers
 Send(CRLF,1);
 end;
 
+procedure TForm1.ActivateSerial(Sender: TObject);
+begin
+SerialPortNG1.Active := True;
+SerialPortNG1.DTRState      :=  DTRdefault;
+SerialPortNG1.RTSState      :=  RTSdefault;
+end;
 
 procedure TForm1.ShowURL( URL : string);
 begin
@@ -1608,7 +1617,7 @@ end;
 procedure TForm1.ConnectMClick(Sender: TObject);
 begin
 if Pos('Open',ConnectM.Caption) = 1 then
-   SerialPortNG1.Active := True
+   ActivateSerial(Sender)
 else
    SerialPortNG1.Active := False;
 end;
@@ -1616,7 +1625,7 @@ end;
 
 procedure TForm1.Connect1Click(Sender: TObject);
 begin
-if Connect1.Caption = 'Connect' then SerialPortNG1.Active := True
+if Connect1.Caption = 'Connect' then ActivateSerial(Sender)
 else SerialPortNG1.Active := False;
 end;
 
@@ -1896,7 +1905,7 @@ ShowMessage('LuaLoader has disconnected from the COM port.'#13#13 +
             'Power up the board'#13#13'[Operation] Click on [Flash(E)] and watch the progress.'#13#13 +
             'When done, disconnect the reflash jumper and power cycle the board.'#13#13 +
             'Click OK to reconnect LuaLoader to the COM port..'#13#13);
-SerialPortNG1.Active := True;
+ActivateSerial(Sender);
 end;
 
 procedure TForm1.BaudRateChange(Sender: TObject);
