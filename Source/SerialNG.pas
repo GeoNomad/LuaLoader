@@ -46,7 +46,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes,
-  Graphics, Controls, Forms, Dialogs;
+  Graphics, Controls, Forms, Dialogs, IniFiles;
 
   // Definitions for the DCB found in windows.pas for reference only
   // All of the baud rates that the DCB supports.
@@ -441,7 +441,7 @@ procedure Register;
 procedure GetCommNames(CommNames : TStrings);
 
 implementation
-uses Registry;
+uses Registry, SerialNGAdv;
 
 var VersionInfo : TOSVersionInfo;
 
@@ -483,7 +483,8 @@ var
   CommStr : string;
 const
   CommPNPKey : string = '\Enum\BIOS\*PNP0501';
-  HardwareKey : string = '\hardware\devicemap\serialcomm';
+  HardwareKey : string = 'HARDWARE\DEVICEMAP\SERIALCOMM';
+//  HardwareKey : string = '\hardware\serialcomm';
 var
   LogStr : String;
   S : String;
@@ -515,8 +516,10 @@ begin
     else
       LogStr := LogStr + '  Unable to open ' + CommPNPKey + #13;
     SerPtSL.Clear; // to use for hardware value names
+
     {check the hardware entries}
-    if OpenKey(HardwareKey, false) then begin
+
+    if OpenKeyReadOnly(HardwareKey) then begin
       LogStr := Format('%s  %s opened%s', [LogStr, HardwareKey, #13]);
       {get the value names for the commports - NT is "Serialn" W95 is "COMn"}
       GetValueNames(SerPtSL);
@@ -542,6 +545,10 @@ begin
     Free; // TFegistry
   end;
   SerPtSL.Free;
+//if (SerialNGAdvDLG.ManualPort.Text <> '') and (CommNames.IndexOf(SerialNGAdvDLG.ManualPort.Text) < 0) then
+//   begin
+//   CommNames.Add(SerialNGAdvDLG.ManualPort.Text);
+//   end;
 end;
 
 //
@@ -1352,9 +1359,9 @@ end;
 // will save to HKEY_CURRENT_USER\Software\DomIS\SerialAdvDemo
 procedure TSerialPortNG.WriteSettings(Regkey, RegSubKey : String);
 
-var FIniFile : TRegIniFile;
+var FIniFile : TIniFile;
 begin
-  FIniFile := TRegIniFile.Create(RegKey);
+  FIniFile := TIniFile.Create( ChangeFileExt(ParamStr(0),'.ini') );
   try
     try
     with FIniFile do
@@ -1400,7 +1407,7 @@ end;
 // e.g. ReadSettings('Software/DomIS','SerialNGAdvDemo')
 // will read from HKEY_CURRENT_USER\Software\DomIS\SerialAdvDemo
 procedure TSerialPortNG.ReadSettings(Regkey, RegSubKey : String);
-var FIniFile : TRegIniFile;
+var FIniFile : TIniFile;
     function CharFromStr(S : String):Char;
     begin
       if Length(S) > 0 then
@@ -1410,7 +1417,7 @@ var FIniFile : TRegIniFile;
     end;
 
 begin
-  FIniFile := TRegIniFile.Create(RegKey);
+  FIniFile := TIniFile.Create( ChangeFileExt(ParamStr(0),'.ini') );
   try
     try
     with FIniFile do

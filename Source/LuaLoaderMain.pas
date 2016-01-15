@@ -17,6 +17,10 @@ unit LuaLoaderMain;
 
 //  TODO - add tmr.stop on restart automatically, also resume higher baud rate
 
+//  0.90 manually add a COM port that is not detected automatically  + user OpenKeyReadOnly to get W10 HARDWARE key
+//  0.90 change to ini files instead of registry
+//  0.89 removed Hard Restart and Soft Restart messages which appeared out of sequence and confused
+//  0.88 allow more baud rates, fix the reset to 9600
 //  0.87 set default DTR and RTS on each connect
 
 //  0.86 changed the default value of DTR and RTS to false = HI
@@ -138,7 +142,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,SerialNG,
   StdCtrls, ExtCtrls, ComCtrls, ImgList, Buttons, URLLabel, ClipBrd, Registry,
-  Menus, ShellAPI, SuperTimer, Math;
+  Menus, ShellAPI, SuperTimer, Math, IniFiles;
 
 type
   TForm1 = class(TForm)
@@ -303,6 +307,7 @@ type
     ListallM: TMenuItem;
     ReadRateM: TPopupMenu;
     Setrepeatrateforread1: TMenuItem;
+    NodeMCUCustomBuilds1: TMenuItem;
     procedure AdvSettingsBtnClick(Sender: TObject);
     procedure SerialPortNG1RxClusterEvent(Sender: TObject);
     procedure SerialPortNG1ProcessError(Sender: TObject; Place,Code: DWord; Msg: String);
@@ -428,6 +433,7 @@ type
     procedure DecodeDL(Sender: TObject);
     procedure ListlcMClick(Sender: TObject);
     procedure ListallMClick(Sender: TObject);
+    procedure NodeMCUCustomBuilds1Click(Sender: TObject);
   private
     { Private declarations }
     RxDCharStartTimer : Boolean;
@@ -490,7 +496,7 @@ DLCapture       : string;
 CustomLuaFile   : string;
 
 const
-  ThisVersion  = '0.87 ';                 // change with each version
+  ThisVersion  = '0.90 ';                 // change with each version
   CRLF         = #$0d#$0a ;
 
 implementation
@@ -572,7 +578,7 @@ end;
 
 procedure TForm1.FormCreate(Sender: TObject);
 var
-Regx : TRegIniFile;
+Regx : TIniFile;
 timers : string;
 i,n : integer;
 ws : string;
@@ -608,7 +614,7 @@ RecentFiles.Duplicates := dupIgnore;
 
 Caption := 'ESP8266 LuaLoader '+ThisVersion;
 
-Regx       := TRegIniFile.Create( 'Software\Benlo.com' );
+Regx       := TIniFile.Create( ChangeFileExt(ParamStr(0),'.ini') );
 Top        := Regx.ReadInteger('LuaLoader','Top',Top);
 Left       := Regx.ReadInteger('LuaLoader','Left',Left);
 Width      := Regx.ReadInteger('LuaLoader','Width',Width);
@@ -708,7 +714,7 @@ end;
 
 procedure TForm1.FormClose(Sender: TObject; var Action: TCloseAction);
 var
-Regx : TRegIniFile;
+Regx : TIniFile;
 i : integer;
 timers : string;
 Temp : TStringList;
@@ -720,7 +726,7 @@ net.TimeOutAbort.Enabled := False;
 SerialPortNG1.WriteSettings('Software\Benlo.com','LuaLoader');
 SerialPortNG1.Active := False;
 
-Regx := TRegIniFile.Create( 'Software\Benlo.com' );
+Regx := TIniFile.Create( ChangeFileExt(ParamStr(0),'.ini') );
 Regx.WriteInteger('LuaLoader','Top',Top);
 Regx.WriteInteger('LuaLoader','Left',Left);
 Regx.WriteInteger('LuaLoader','Width',Width);
@@ -1011,10 +1017,10 @@ begin
     if (0 < Pos('NODEMCU ',UpperCase(line))) and  (0 < Pos('owered by Lua',line)) then
        begin
        line := Trim(Copy(line,9,Length(LatestNodeMCU)));
-       if not SoftRestart then
-           begin
-           Show('Hard Restart '+FormatDateTime('dddddd  hh:nn:ss',Now),1);
-           end;
+//       if not SoftRestart then
+//           begin
+//           Show('Hard Restart '+FormatDateTime('dddddd  hh:nn:ss',Now),1);
+//           end;
        SoftRestart := False;
        if line < Trim(LatestNodeMCU) then
           begin
@@ -1233,6 +1239,12 @@ newrate := SerialPortNG1.BaudRate;
 if FastUp.Checked and (SerialPortNG1.BaudRate <> 921600) then
    begin
    newrate := 921600;
+   SerialPortNG1.BaudRate := newrate;
+   i := BaudRate.Items.IndexOf(IntToStr(SerialPortNG1.BaudRate));
+   if i >= 0 then
+      BaudRate.ItemIndex := i
+   else
+      BaudRate.Text := IntToStr(SerialPortNG1.BaudRate);
    BaudRate.ItemIndex := 8;
    Show('Baud rate changed to '+IntToStr(newrate),1);
    end;
@@ -1461,6 +1473,8 @@ Send('= node.heap()'+CRLF,1);
 end;
 
 procedure TForm1.RestartBtnClick(Sender: TObject);
+var
+i : integer;
 begin
 RepeatTimer.Enabled := False;
 if HideRestartGarbageM.checked then
@@ -1475,10 +1489,14 @@ if AutoResetBaudRateM.Checked and (SerialPortNG1.BaudRate <> 9600) then
     begin
     SerialPortNG1.BaudRate := 9600;
     StatusBar.SimpleText := 'Baud rate reduced to 9600';
-    BaudRate.ItemIndex := 0;
+    i := BaudRate.Items.IndexOf(IntToStr(SerialPortNG1.BaudRate));
+    if i >= 0 then
+       BaudRate.ItemIndex := i
+    else
+       BaudRate.Text := IntToStr(SerialPortNG1.BaudRate);
     end;
 
-Show('Soft Restart '+FormatDateTime('dddddd  hh:nn:ss',Now),1);
+//Show('Soft Restart '+FormatDateTime('dddddd  hh:nn:ss',Now),1);
 SoftRestart := True;
 end;
 
@@ -1748,9 +1766,9 @@ if LatestNodeMCU > LatestLua then
 
 APIrevision := '';
 if Items.Count > 1 then APIrevision := Items[1];
-NodeMcuLua1.Caption := 'NodeMCU Lua API ';
-if length(APIrevision) > 5 then
-   NodeMcuLua1.Caption := NodeMcuLua1.Caption +'  (revised '+APIrevision+ ')' ;
+NodeMcuLua1.Caption := 'NodeMCU Lua API '+LatestNodeMCU;
+//if length(APIrevision) > 5 then
+//   NodeMcuLua1.Caption := NodeMcuLua1.Caption +'  (revised '+APIrevision+ ')' ;
 Items.Free;
 end;
 
@@ -1947,10 +1965,16 @@ end;
 procedure TForm1.ResetBaudTimerStop(Sender: TObject);
 var
 newrate : string;
+i : integer;
 begin
 if BaudRate.Text <> '9600' then
     begin
-    BaudRate.ItemIndex := 0;
+    SerialPortNG1.BaudRate := 9600;
+    i := BaudRate.Items.IndexOf(IntToStr(SerialPortNG1.BaudRate));
+    if i >= 0 then
+       BaudRate.ItemIndex := i
+    else
+       BaudRate.Text := IntToStr(SerialPortNG1.BaudRate);
     newrate := Trim(BaudRate.Items[BaudRate.ItemIndex]);
     SerialPortNG1.BaudRate := StrToIntDef(newrate,9600);
     Show('Baud rate changed to '+newrate,1);
@@ -2509,23 +2533,25 @@ end;
 
 procedure TForm1.DownLoadBtnClick(Sender: TObject);
 var
-newrate : integer;
 fname : string;
+i : integer;
 begin
 DLCapture := '';
 
-newrate := SerialPortNG1.BaudRate;
 if FastUp.Checked and (SerialPortNG1.BaudRate <> 921600) then
    begin
-   newrate := 921600;
-   BaudRate.ItemIndex := 8;
-   Show('Baud rate changed to '+IntToStr(newrate),1);
+   SerialPortNG1.BaudRate := 921600;
+   i := BaudRate.Items.IndexOf(IntToStr(SerialPortNG1.BaudRate));
+   if i >= 0 then
+      BaudRate.ItemIndex := i
+   else
+      BaudRate.Text := IntToStr(SerialPortNG1.BaudRate);
+   Show('Baud rate changed to '+IntToStr(SerialPortNG1.BaudRate),1);
    end;
 
-Send('uart.setup(0,'+IntToStr(newrate)+',8,0,1,1)'+CRLF,0);
+Send('uart.setup(0,'+IntToStr(SerialPortNG1.BaudRate)+',8,0,1,1)'+CRLF,0);
 Pause(300);  // allow command to be sent
 
-SerialPortNG1.BaudRate := newrate;
 SerialPortNG1.WriteSettings('Software\Benlo.com','LuaLoader');
 
 AwaitPrompt(2000);
@@ -2678,6 +2704,12 @@ end;
 procedure TForm1.ListallMClick(Sender: TObject);
 begin
 ListallM.Checked := not ListAllM.Checked;
+end;
+
+procedure TForm1.NodeMCUCustomBuilds1Click(Sender: TObject);
+begin
+ShowMessage('Save the latest bin file in the same folder as the flasher app');
+ShowURL('http://nodemcu-build.com/');
 end;
 
 end.

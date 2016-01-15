@@ -30,7 +30,6 @@ type
     Label6: TLabel;
     Label7: TLabel;
     Label8: TLabel;
-    CBOpenPort: TCheckBox;
     Label1: TLabel;
     Label2: TLabel;
     Label9: TLabel;
@@ -59,11 +58,14 @@ type
     Label17: TLabel;
     EventCharEdit: TEdit;
     PortBtn: TButton;
+    ManualPort: TEdit;
+    Label18: TLabel;
     procedure ValidateCharInput(Sender: TObject);
     procedure ValidateInteger(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure PortBtnClick(Sender: TObject);
+    procedure ManualPortExit(Sender: TObject);
   private
     { Private declarations }
   public
@@ -185,7 +187,7 @@ begin
   else
     CBFlow.ItemIndex := 0;
   end;
-  CBOpenPort.Checked := SerialPortNG.Active;
+//  CBOpenPort.Checked := SerialPortNG.Active;
 // Page 2 Timing
   WTOCharDelayEdit.Text := IntToStr(SerialPortNG.WTOCharDelayTime);
   RTOCharDelayEdit.Text := IntToStr(SerialPortNG.RTOCharDelayTime);
@@ -238,7 +240,7 @@ begin
   SerialPortNG.StripNullChars := CBStripNullChars.Checked;
   SerialPortNG.ErrorNoise := CBReport.Itemindex;
 // Try to Open the Port if wished
-  SerialPortNG.Active := CBOpenPort.Checked;
+//  SerialPortNG.Active := CBOpenPort.Checked;
 end;
 
 procedure TSerialNGAdvDLG.FormCreate(Sender: TObject);
@@ -254,6 +256,15 @@ end;
 procedure TSerialNGAdvDLG.PortBtnClick(Sender: TObject);
 begin
 net.ShowURL('http://benlo.com/esp8266/index.html#faq');
+end;
+
+procedure TSerialNGAdvDLG.ManualPortExit(Sender: TObject);
+begin
+ManualPort.Text := UpperCase(ManualPort.Text);
+if (ManualPort.Text <> '') and (CBPort.Items.IndexOf(ManualPort.Text) < 0) then
+   begin
+   CBPort.Items.Add(ManualPort.Text);
+   end;
 end;
 
 end.
